@@ -1,0 +1,28 @@
+{
+  "name": "dubai-transit-api",
+  "version": "1.0.0",
+  "description": "Dubai Bus and Metro API - Offline First",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node scripts/seed-database.js",
+    "import": "node scripts/import-gtfs.js",
+    "download": "node scripts/download-and-import.js",
+    "update": "node scripts/auto-update.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "7zip-bin": "^5.2.0",
+    "axios": "^1.13.2",
+    "better-sqlite3": "^12.5.0",
+    "cors": "^2.8.5",
+    "csv-parser": "^3.2.0",
+    "express": "^5.2.1",
+    "node-7z": "^3.0.0",
+    "unzipper": "^0.12.3"
+  }
+}
