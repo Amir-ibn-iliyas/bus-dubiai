@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "gtfs_date": "20250823",
+  "updated_at": "2026-01-09T08:00:29.344Z",
+  "database": {
+    "filename": "dubai_transit_offline.db",
+    "size_bytes": 1404928,
+    "size_mb": 1.34,
+    "hash": "ef105568bd6ee5e19bae754726512150",
+    "download_url": "YOUR_HOSTING_URL/dubai_transit_offline.db"
+  },
+  "changes": "Initial release with Dubai RTA GTFS data",
+  "min_app_version": "1.0.0"
+}
