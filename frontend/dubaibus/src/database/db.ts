@@ -14,63 +14,70 @@ const DATABASE_NAME = "dubai_transit_offline.db";
 
 // Database instance
 let db: SQLite.SQLiteDatabase | null = null;
+let initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 /**
  * Initialize the database
  * Copies the bundled database to the app's document directory if needed
  */
 export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (db) {
-    return db;
-  }
+  if (db) return db;
+  if (initPromise) return initPromise;
 
-  // Create SQLite directory in document folder
-  const sqliteDir = new Directory(Paths.document, "SQLite");
-  const dbFile = new File(sqliteDir, DATABASE_NAME);
-
-  // Check if database already exists and has content
-  if (dbFile.exists && dbFile.size && dbFile.size > 0) {
+  initPromise = (async () => {
     try {
-      // Try to open existing database
-      db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+      // Create SQLite directory in document folder
+      const sqliteDir = new Directory(Paths.document, "SQLite");
+      const dbFile = new File(sqliteDir, DATABASE_NAME);
 
-      // Verify database has tables
-      const result = await db.getFirstAsync<{ count: number }>(
-        "SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='routes'"
-      );
+      // Check if database already exists and has content
+      if (dbFile.exists && dbFile.size && dbFile.size > 0) {
+        try {
+          const checkDb = await SQLite.openDatabaseAsync(DATABASE_NAME);
+          const result = await checkDb.getFirstAsync<{ count: number }>(
+            "SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='routes'"
+          );
 
-      if (result && result.count > 0) {
-        console.log("✅ Database opened successfully");
-        return db;
+          if (result && result.count > 0) {
+            console.log("✅ Database opened successfully");
+            db = checkDb;
+            return db;
+          }
+          await checkDb.closeAsync();
+        } catch (e) {
+          console.log("📦 Database needs to be recopied...");
+        }
       }
-    } catch (e) {
-      console.log("📦 Database needs to be recopied...");
+
+      // Create SQLite directory if it doesn't exist
+      if (!sqliteDir.exists) {
+        await sqliteDir.create();
+      }
+
+      // Load the bundled database asset
+      const asset = Asset.fromModule(
+        require("../../assets/database/dubai_transit_offline.db")
+      );
+      await asset.downloadAsync();
+
+      if (asset.localUri) {
+        const assetFile = new File(asset.localUri);
+        await assetFile.copy(dbFile);
+        console.log("✅ Database copied successfully");
+      }
+
+      // Open the database
+      db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+      console.log("✅ Database opened");
+
+      return db;
+    } catch (error) {
+      initPromise = null; // Reset promise so it can be retried
+      throw error;
     }
-  }
+  })();
 
-  // Create SQLite directory if it doesn't exist
-  if (!sqliteDir.exists) {
-    await sqliteDir.create();
-  }
-
-  // Load the bundled database asset
-  const asset = Asset.fromModule(
-    require("../../assets/database/dubai_transit_offline.db")
-  );
-  await asset.downloadAsync();
-
-  if (asset.localUri) {
-    // Copy asset to SQLite directory
-    const assetFile = new File(asset.localUri);
-    await assetFile.copy(dbFile);
-    console.log("✅ Database copied successfully");
-  }
-
-  // Open the database
-  db = await SQLite.openDatabaseAsync(DATABASE_NAME);
-  console.log("✅ Database opened");
-
-  return db;
+  return initPromise;
 }
 
 /**
@@ -523,10 +530,25 @@ export interface FoundRoute {
   route_name: string;
   transport_type: "Bus" | "Metro";
   color: string;
+  from_stop_id: string;
   from_stop: string;
+  to_stop_id: string;
   to_stop: string;
   stops_between: number;
   direction: string;
+  // Details for path finding
+  pattern_id: number;
+  from_seq: number;
+  to_seq: number;
+  // Transfer specific
+  transfer_stop_id?: string;
+  transfer_stop_name?: string;
+  leg2_route_id?: string;
+  leg2_name?: string;
+  leg2_color?: string;
+  leg2_pattern_id?: number;
+  leg2_from_seq?: number;
+  leg2_to_seq?: number;
 }
 
 /**
@@ -589,11 +611,16 @@ export async function findDirectRoutes(
     route_id: r.route_id,
     route_name: r.route_short_name,
     transport_type: (r.route_type === 1 ? "Metro" : "Bus") as "Bus" | "Metro",
-    color: r.route_color,
+    color: r.route_color || (r.route_type === 1 ? "E21836" : "F7941D"),
+    from_stop_id: fromStopId,
     from_stop: fromStop?.stop_name || "",
+    to_stop_id: toStopId,
     to_stop: toStop?.stop_name || "",
     stops_between: r.to_seq - r.from_seq,
     direction: r.headsign || (r.direction_id === 0 ? "Upward" : "Downward"),
+    pattern_id: r.pattern_id,
+    from_seq: r.from_seq,
+    to_seq: r.to_seq,
   }));
 }
 
@@ -616,6 +643,9 @@ export async function findTransferRoutes(
     r1_type: number;
     r1_color: string;
     r1_headsign: string;
+    r1_pattern_id: number;
+    r1_from_seq: number;
+    r1_to_seq: number;
     transfer_stop_id: string;
     transfer_stop_name: string;
     r2_id: string;
@@ -623,12 +653,17 @@ export async function findTransferRoutes(
     r2_type: number;
     r2_color: string;
     r2_headsign: string;
+    r2_pattern_id: number;
+    r2_from_seq: number;
+    r2_to_seq: number;
   }>(
     `
     SELECT DISTINCT
       r1.route_id as r1_id, r1.route_short_name as r1_name, r1.route_type as r1_type, r1.route_color as r1_color, rp1.headsign as r1_headsign,
+      rp1.pattern_id as r1_pattern_id, ps1_start.stop_sequence as r1_from_seq, ps1_trans.stop_sequence as r1_to_seq,
       s_trans.stop_id as transfer_stop_id, s_trans.stop_name as transfer_stop_name,
-      r2.route_id as r2_id, r2.route_short_name as r2_name, r2.route_type as r2_type, r2.route_color as r2_color, rp2.headsign as r2_headsign
+      r2.route_id as r2_id, r2.route_short_name as r2_name, r2.route_type as r2_type, r2.route_color as r2_color, rp2.headsign as r2_headsign,
+      rp2.pattern_id as r2_pattern_id, ps2_trans.stop_sequence as r2_from_seq, ps2_end.stop_sequence as r2_to_seq
     FROM pattern_stops ps1_start
     JOIN pattern_stops ps1_trans ON ps1_start.pattern_id = ps1_trans.pattern_id
     JOIN route_patterns rp1 ON ps1_start.pattern_id = rp1.pattern_id
@@ -651,23 +686,58 @@ export async function findTransferRoutes(
     [fromStopId, toStopId]
   );
 
-  return routes.map(
-    (r) =>
-      ({
-        type: "transfer" as const,
-        route_id: r.r1_id,
-        route_name: `${r.r1_name} ➔ ${r.r2_name}`,
-        transport_type: (r.r1_type === 1 ? "Metro" : "Bus") as "Bus" | "Metro",
-        color: r.r1_color,
-        from_stop: "", // Not used in this simplified summary
-        to_stop: "",
-        stops_between: 0,
-        direction: `Transfer at ${r.transfer_stop_name}`,
-        // Adding extra fields for UI display of transfers
-        transfer_at: r.transfer_stop_name,
-        leg2_name: r.r2_name,
-        leg2_color: r.r2_color,
-      } as any)
+  return routes.map((r) => ({
+    type: "transfer" as const,
+    route_id: r.r1_id,
+    route_name: `${r.r1_name} ➔ ${r.r2_name}`,
+    transport_type: (r.r1_type === 1 ? "Metro" : "Bus") as "Bus" | "Metro",
+    color: r.r1_color || (r.r1_type === 1 ? "E21836" : "F7941D"),
+    from_stop_id: fromStopId,
+    from_stop: "", // Will be filled by detail fetch
+    to_stop_id: toStopId,
+    to_stop: "",
+    stops_between: r.r1_to_seq - r.r1_from_seq + (r.r2_to_seq - r.r2_from_seq),
+    direction: `Transfer via ${r.transfer_stop_name}`,
+    pattern_id: r.r1_pattern_id,
+    from_seq: r.r1_from_seq,
+    to_seq: r.r1_to_seq,
+    transfer_stop_id: r.transfer_stop_id,
+    transfer_stop_name: r.transfer_stop_name,
+    leg2_route_id: r.r2_id,
+    leg2_name: r.r2_name,
+    leg2_color: r.r2_color || (r.r2_type === 1 ? "E21836" : "F7941D"),
+    leg2_pattern_id: r.r2_pattern_id,
+    leg2_from_seq: r.r2_from_seq,
+    leg2_to_seq: r.r2_to_seq,
+  }));
+}
+
+/**
+ * Get stops for a specific leg of a journey
+ */
+export async function getJourneyLegStops(
+  patternId: number,
+  fromSeq: number,
+  toSeq: number
+): Promise<Stop[]> {
+  const database = getDatabase();
+
+  return await database.getAllAsync<Stop>(
+    `
+    SELECT 
+      ps.stop_sequence,
+      s.stop_id,
+      s.stop_name,
+      s.stop_lat,
+      s.stop_lon
+    FROM pattern_stops ps
+    JOIN stops s ON ps.stop_id = s.stop_id
+    WHERE ps.pattern_id = ?
+      AND ps.stop_sequence >= ?
+      AND ps.stop_sequence <= ?
+    ORDER BY ps.stop_sequence
+  `,
+    [patternId, fromSeq, toSeq]
   );
 }
 

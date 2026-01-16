@@ -3,3 +3,4 @@
  */
 
 export { RouteCard } from "./RouteCard";
+export * from "./JourneyTimeline";

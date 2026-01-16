@@ -20,6 +20,7 @@ export const routes = {
 
   journey: {
     index: "/journey",
+    details: "/journey/details",
   },
 } as const;
 
@@ -37,5 +38,6 @@ export const screenTitles = {
   },
   journey: {
     index: "Journey Planner",
+    details: "Journey Path",
   },
 } as const;

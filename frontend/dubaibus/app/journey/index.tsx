@@ -108,14 +108,13 @@ export default function JourneyScreen() {
     }
   }, [fromStop, toStop, searchRoutes]);
 
-  // Handle route press - navigate to bus/metro details
+  // Handle route press - navigate to journey details
   const handleRoutePress = useCallback(
-    (route: { route_name: string; transport_type: string }) => {
-      if (route.transport_type === "Bus") {
-        router.push(routes.bus.details(route.route_name));
-      } else {
-        router.push(routes.metro.details(route.route_name));
-      }
+    (routeData: any) => {
+      router.push({
+        pathname: routes.journey.details,
+        params: { routeData: JSON.stringify(routeData) },
+      });
     },
     [router]
   );

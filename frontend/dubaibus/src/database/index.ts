@@ -17,7 +17,12 @@ export { getAllMetroLines, getMetroDetails } from "./db";
 export { searchStops, getRoutesAtStop } from "./db";
 
 // Route finding
-export { findDirectRoutes, findTransferRoutes, type FoundRoute } from "./db";
+export {
+  findDirectRoutes,
+  findTransferRoutes,
+  getJourneyLegStops,
+  type FoundRoute,
+} from "./db";
 
 // Note: Types are exported from @/types, not here
 // This avoids type conflicts

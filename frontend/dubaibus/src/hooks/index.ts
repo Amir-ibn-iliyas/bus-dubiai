@@ -11,3 +11,4 @@ export { useMetroLines } from "./useMetroLines";
 export { useMetroDetails } from "./useMetroDetails";
 export { useStopSearch } from "./useStopSearch";
 export { useJourneySearch } from "./useJourneySearch";
+export { useJourneyDetails } from "./useJourneyDetails";
