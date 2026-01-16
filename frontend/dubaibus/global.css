@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom component classes for RTA Dubai theme */
+@layer components {
+  /* Neumorphic Card */
+  .card-neumorphic {
+    @apply bg-white rounded-card;
+    box-shadow: 8px 8px 16px #d1d1d1, -8px -8px 16px #ffffff;
+  }
+
+  /* Elevated Card */
+  .card-elevated {
+    @apply bg-white rounded-card shadow-card;
+  }
+
+  /* Primary Button (Orange) */
+  .btn-primary {
+    @apply bg-rta-orange text-white font-semibold py-4 px-6 rounded-button;
+    @apply active:bg-rta-orange-dark;
+  }
+
+  /* Secondary Button (Blue) */
+  .btn-secondary {
+    @apply bg-rta-blue text-white font-semibold py-4 px-6 rounded-button;
+    @apply active:bg-rta-blue-dark;
+  }
+
+  /* Outline Button */
+  .btn-outline {
+    @apply bg-transparent border-2 border-rta-orange text-rta-orange font-semibold py-4 px-6 rounded-button;
+  }
+
+  /* Input Field */
+  .input-field {
+    @apply bg-white border-2 border-gray-200 rounded-input py-3 px-4 text-text-primary;
+    @apply focus:border-rta-orange;
+  }
+
+  /* Metro Line Card Colors */
+  .metro-red {
+    @apply border-l-4 border-metro-red;
+  }
+
+  .metro-green {
+    @apply border-l-4 border-metro-green;
+  }
+
+  .metro-blue {
+    @apply border-l-4 border-metro-blue;
+  }
+
+  /* Timeline Dot */
+  .timeline-dot {
+    @apply w-3 h-3 rounded-full bg-rta-orange;
+  }
+
+  /* Timeline Line */
+  .timeline-line {
+    @apply w-0.5 bg-rta-orange;
+  }
+}
