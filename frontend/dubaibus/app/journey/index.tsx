@@ -23,6 +23,7 @@ import { colors, screenTitles, routes } from "@/constants";
 import type { Stop } from "@/types";
 
 type PickerMode = "from" | "to" | null;
+type SearchMode = "All" | "Bus" | "Metro";
 
 export default function JourneyScreen() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export default function JourneyScreen() {
   // Picker state
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [transportMode, setTransportMode] = useState<SearchMode>("All");
 
   // Stop search (for picker)
   const { results, search, clear, isLoading: isSearching } = useStopSearch();
@@ -49,15 +51,27 @@ export default function JourneyScreen() {
 
   // Handle search input
   const handleSearch = useCallback(
-    (text: string) => {
+    (text: string, modeOverride?: SearchMode) => {
       setSearchQuery(text);
+      const mode = modeOverride || transportMode;
       if (text.trim().length >= 2) {
-        search(text);
+        search(text, mode === "All" ? undefined : mode);
       } else {
         clear();
       }
     },
-    [search, clear]
+    [search, clear, transportMode]
+  );
+
+  // Clear selection when transport mode changes
+  const handleModeSelection = useCallback(
+    (mode: SearchMode) => {
+      setTransportMode(mode);
+      setFromStop(null);
+      setToStop(null);
+      clearRoutes();
+    },
+    [clearRoutes]
   );
 
   // Handle stop selection
@@ -136,7 +150,7 @@ export default function JourneyScreen() {
           placeholder="Search stop or station..."
           showSearchIcon
           autoFocus
-          className="mb-4"
+          className="mb-2"
         />
 
         {/* Search Results */}
@@ -167,15 +181,34 @@ export default function JourneyScreen() {
               <Pressable onPress={() => handleSelectStop(item)}>
                 <Card variant="flat" className="mb-2">
                   <View className="flex-row items-center">
-                    <View className="w-10 h-10 rounded-full bg-rta-orange/10 items-center justify-center mr-3">
+                    <View
+                      className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                      style={{
+                        backgroundColor:
+                          item.stop_id.includes(":") &&
+                          !item.stop_id.match(/^[0-9]+$/)
+                            ? `${colors.metro.red}15`
+                            : `${colors.rta.orange}15`,
+                      }}
+                    >
                       <Ionicons
-                        name="location"
+                        name={
+                          item.stop_id.includes(":") &&
+                          !item.stop_id.match(/^[0-9]+$/)
+                            ? "subway"
+                            : "bus"
+                        }
                         size={20}
-                        color={colors.rta.orange}
+                        color={
+                          item.stop_id.includes(":") &&
+                          !item.stop_id.match(/^[0-9]+$/)
+                            ? colors.metro.red
+                            : colors.rta.orange
+                        }
                       />
                     </View>
                     <Text
-                      className="flex-1 text-text-primary"
+                      className="flex-1 text-text-primary font-poppins-medium"
                       numberOfLines={2}
                     >
                       {item.stop_name}
@@ -198,6 +231,58 @@ export default function JourneyScreen() {
       <Header title={screenTitles.journey.index} showBack />
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Ride Type Selector */}
+        <View className="mb-6">
+          <Text className="text-sm font-poppins-semibold text-text-secondary mb-3 px-1">
+            SELECT RIDE TYPE
+          </Text>
+          <View className="flex-row gap-2">
+            {(["All", "Bus", "Metro"] as SearchMode[]).map((mode) => {
+              const isActive = transportMode === mode;
+              const modeColor =
+                mode === "Bus"
+                  ? colors.rta.orange
+                  : mode === "Metro"
+                  ? colors.metro.red
+                  : colors.rta.blue;
+
+              return (
+                <Pressable
+                  key={mode}
+                  onPress={() => handleModeSelection(mode)}
+                  className={`flex-1 py-3 rounded-xl items-center justify-center border-2 ${
+                    isActive ? "" : "border-gray-100 bg-white"
+                  }`}
+                  style={
+                    isActive
+                      ? { backgroundColor: modeColor, borderColor: modeColor }
+                      : {}
+                  }
+                >
+                  <Ionicons
+                    name={
+                      mode === "Bus"
+                        ? "bus"
+                        : mode === "Metro"
+                        ? "subway"
+                        : "options"
+                    }
+                    size={20}
+                    color={isActive ? "white" : colors.text.muted}
+                    className="mb-1"
+                  />
+                  <Text
+                    className={`text-xs font-poppins-bold ${
+                      isActive ? "text-white" : "text-text-muted"
+                    }`}
+                  >
+                    {mode.toUpperCase()}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
         {/* Stop Selection Card */}
         <Card variant="elevated" className="mb-4">
           {/* From Stop */}

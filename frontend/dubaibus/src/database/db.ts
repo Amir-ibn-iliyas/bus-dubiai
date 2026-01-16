@@ -439,23 +439,39 @@ export async function getMetroDetails(
 // ==========================================
 
 /**
- * Search stops by name
+ * Search stops by name, with optional filtering by transport type
  */
-export async function searchStops(query: string): Promise<Stop[]> {
+export async function searchStops(
+  query: string,
+  transportType?: "Bus" | "Metro"
+): Promise<Stop[]> {
   const database = getDatabase();
 
-  const words = query.trim().toLowerCase().split(/\s+/);
-  const fuzzyPattern = "%" + words.join("%") + "%";
+  const fuzzyPattern = `%${query.trim().toLowerCase()}%`;
 
-  const result = await database.getAllAsync<Stop & { location_type: number }>(
+  // route_type: 1 = Metro, 3 = Bus
+  const typeFilter =
+    transportType === "Metro"
+      ? "AND s.stop_id IN (SELECT stop_id FROM stop_routes sr JOIN routes r ON sr.route_id = r.route_id WHERE r.route_type = 1)"
+      : transportType === "Bus"
+      ? "AND s.stop_id IN (SELECT stop_id FROM stop_routes sr JOIN routes r ON sr.route_id = r.route_id WHERE r.route_type = 3)"
+      : "";
+
+  const result = await database.getAllAsync<Stop>(
     `
-    SELECT stop_id, stop_name, stop_lat, stop_lon, location_type
-    FROM stops 
-    WHERE LOWER(stop_name) LIKE ?
-    ORDER BY LENGTH(stop_name)
+    SELECT DISTINCT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+    FROM stops s
+    WHERE LOWER(s.stop_name) LIKE ? ${typeFilter}
+    ORDER BY 
+      CASE 
+        WHEN LOWER(s.stop_name) = ? THEN 1
+        WHEN LOWER(s.stop_name) LIKE ? THEN 2
+        ELSE 3
+      END,
+      LENGTH(s.stop_name) ASC
     LIMIT 20
   `,
-    [fuzzyPattern]
+    [fuzzyPattern, query.toLowerCase(), `${query.toLowerCase()}%`]
   );
 
   return result;
@@ -587,13 +603,13 @@ export async function findDirectRoutes(
     JOIN pattern_stops ps2 ON ps1.pattern_id = ps2.pattern_id
     JOIN route_patterns rp ON ps1.pattern_id = rp.pattern_id
     JOIN routes r ON rp.route_id = r.route_id
-    WHERE ps1.stop_id = ?
-      AND ps2.stop_id = ?
+    WHERE (ps1.stop_id = ? OR ps1.stop_id IN (SELECT s.stop_id FROM stops s WHERE s.stop_name = (SELECT s2.stop_name FROM stops s2 WHERE s2.stop_id = ?)))
+      AND (ps2.stop_id = ? OR ps2.stop_id IN (SELECT s.stop_id FROM stops s WHERE s.stop_name = (SELECT s2.stop_name FROM stops s2 WHERE s2.stop_id = ?)))
       AND ps1.stop_sequence < ps2.stop_sequence
     ORDER BY (ps2.stop_sequence - ps1.stop_sequence) ASC
     LIMIT 10
   `,
-    [fromStopId, toStopId]
+    [fromStopId, fromStopId, toStopId, toStopId]
   );
 
   // Get stop names
@@ -676,14 +692,14 @@ export async function findTransferRoutes(
     
     JOIN stops s_trans ON ps1_trans.stop_id = s_trans.stop_id
     
-    WHERE ps1_start.stop_id = ?
-      AND ps2_end.stop_id = ?
+    WHERE (ps1_start.stop_id = ? OR ps1_start.stop_id IN (SELECT s.stop_id FROM stops s WHERE s.stop_name = (SELECT s2.stop_name FROM stops s2 WHERE s2.stop_id = ?)))
+      AND (ps2_end.stop_id = ? OR ps2_end.stop_id IN (SELECT s.stop_id FROM stops s WHERE s.stop_name = (SELECT s2.stop_name FROM stops s2 WHERE s2.stop_id = ?)))
       AND ps1_start.stop_sequence < ps1_trans.stop_sequence
       AND ps2_trans.stop_sequence < ps2_end.stop_sequence
       AND r1.route_id != r2.route_id
     LIMIT 5
     `,
-    [fromStopId, toStopId]
+    [fromStopId, fromStopId, toStopId, toStopId]
   );
 
   // Get start and end stop names for the summary
