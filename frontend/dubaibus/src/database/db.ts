@@ -686,6 +686,16 @@ export async function findTransferRoutes(
     [fromStopId, toStopId]
   );
 
+  // Get start and end stop names for the summary
+  const fromStop = await database.getFirstAsync<{ stop_name: string }>(
+    "SELECT stop_name FROM stops WHERE stop_id = ?",
+    [fromStopId]
+  );
+  const toStop = await database.getFirstAsync<{ stop_name: string }>(
+    "SELECT stop_name FROM stops WHERE stop_id = ?",
+    [toStopId]
+  );
+
   return routes.map((r) => ({
     type: "transfer" as const,
     route_id: r.r1_id,
@@ -693,9 +703,9 @@ export async function findTransferRoutes(
     transport_type: (r.r1_type === 1 ? "Metro" : "Bus") as "Bus" | "Metro",
     color: r.r1_color || (r.r1_type === 1 ? "E21836" : "F7941D"),
     from_stop_id: fromStopId,
-    from_stop: "", // Will be filled by detail fetch
+    from_stop: fromStop?.stop_name || "",
     to_stop_id: toStopId,
-    to_stop: "",
+    to_stop: toStop?.stop_name || "",
     stops_between: r.r1_to_seq - r.r1_from_seq + (r.r2_to_seq - r.r2_from_seq),
     direction: `Transfer via ${r.transfer_stop_name}`,
     pattern_id: r.r1_pattern_id,

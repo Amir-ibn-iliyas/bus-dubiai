@@ -64,40 +64,53 @@ export default function JourneyDetailsScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Quick Summary Card */}
         <Card variant="elevated" className="m-4 mb-2">
-          <View className="flex-row items-center justify-between mb-3">
-            <View className="flex-row items-center">
-              <View className="w-8 h-8 rounded-full bg-green-100 items-center justify-center mr-2">
-                <Ionicons name="location" size={16} color="green" />
-              </View>
+          {/* From Stop */}
+          <View className="flex-row items-center mb-3">
+            <View className="w-8 h-8 rounded-full bg-green-100 items-center justify-center mr-3">
+              <Ionicons name="location" size={16} color="green" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-xs text-text-muted font-poppins-medium uppercase">
+                Origin
+              </Text>
               <Text
-                className="font-poppins-semibold text-text-primary"
+                className="font-poppins-semibold text-text-primary text-base"
                 numberOfLines={1}
               >
-                {route.from_stop}
+                {legs[0]?.from_stop_name ||
+                  route.from_stop ||
+                  "Loading origin..."}
               </Text>
             </View>
           </View>
 
-          <View className="flex-row items-center mb-3">
-            <View className="flex-1 h-px bg-gray-200" />
-            <View className="mx-3 px-3 py-1 bg-gray-100 rounded-full">
-              <Text className="text-xs font-poppins-medium text-text-secondary">
+          {/* Connection Line */}
+          <View className="flex-row items-center my-1 ml-4 border-l-2 border-dashed border-gray-200 h-6">
+            <View className="absolute left-4 px-3 py-0.5 bg-rta-blue/10 rounded-full">
+              <Text className="text-[10px] font-poppins-bold text-rta-blue uppercase">
                 {route.stops_between} stops total
               </Text>
             </View>
-            <View className="flex-1 h-px bg-gray-200" />
           </View>
 
-          <View className="flex-row items-center">
-            <View className="w-8 h-8 rounded-full bg-red-100 items-center justify-center mr-2">
+          {/* To Stop */}
+          <View className="flex-row items-center mt-3">
+            <View className="w-8 h-8 rounded-full bg-red-100 items-center justify-center mr-3">
               <Ionicons name="flag" size={16} color="red" />
             </View>
-            <Text
-              className="font-poppins-semibold text-text-primary"
-              numberOfLines={1}
-            >
-              {route.to_stop || "Your Destination"}
-            </Text>
+            <View className="flex-1">
+              <Text className="text-xs text-text-muted font-poppins-medium uppercase">
+                Destination
+              </Text>
+              <Text
+                className="font-poppins-semibold text-text-primary text-base"
+                numberOfLines={1}
+              >
+                {legs[legs.length - 1]?.to_stop_name ||
+                  route.to_stop ||
+                  "Your Destination"}
+              </Text>
+            </View>
           </View>
         </Card>
 
